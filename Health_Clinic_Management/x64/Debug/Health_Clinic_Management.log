@@ -1,0 +1,5 @@
+﻿  Health_Clinic_Management.cpp
+E:\LU_Leipzig\ProgramClinic\Health_Clinic_Management\Health_Clinic_Management\Health_Clinic_Management.cpp(39,19): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
+  Health_Clinic_Management.vcxproj -> E:\LU_Leipzig\ProgramClinic\Health_Clinic_Management\Health_Clinic_Management\x64\Debug\Health_Clinic_Management.exe
+  'pwsh.exe' is not recognized as an internal or external command,
+  operable program or batch file.
