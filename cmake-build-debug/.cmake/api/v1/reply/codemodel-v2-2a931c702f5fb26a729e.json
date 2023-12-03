@@ -49,8 +49,8 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "/Users/charton/Desktop/Health_Clinic_Management-main/cmake-build-debug",
-		"source" : "/Users/charton/Desktop/Health_Clinic_Management-main"
+		"build" : "/Users/charton/Git/Health_Clinic_Management/cmake-build-debug",
+		"source" : "/Users/charton/Git/Health_Clinic_Management"
 	},
 	"version" : 
 	{

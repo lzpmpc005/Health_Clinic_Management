@@ -1,8 +1,9 @@
-#include<iostream>
-#include<vector>
-#include<fstream>
+#include <iostream>
+#include <vector>
+#include <fstream>
 #include <cstdlib>
 #include <ctime>
+#include <sstream>
 
 using namespace std;
 
@@ -82,7 +83,11 @@ vector<Patient> ReadPatientsFromFile() {
     Patient p;
 
     if (infile.is_open()) {
-        while (infile >> p) {
+        string line;
+        while (getline(infile, line)) {
+            stringstream ss(line);
+            char comma; // to read the comma
+            ss >> p.P_id >> comma >> p.P_name >> comma >> p.P_address >> comma >> p.P_history;
             patients.push_back(p);
         }
         infile.close();
@@ -100,10 +105,16 @@ void MakeAppointment(vector<Patient>& patients)
 {
     Appointment a;
     Patient p;
-// Check current seats
+
+    // Check if current seats enough
+    if (current_seats <= 0) {
+        cout << "No available seats for appointment. Please try again later.\n";
+        return;
+    }
 
     // Check if Patient ID exists
     int PatientID;
+    cout << "Remaining seats: " << current_seats << "\n";
     cout << "Enter Patient ID for appointment: ";
     cin >> PatientID;
 
@@ -132,6 +143,8 @@ void MakeAppointment(vector<Patient>& patients)
             outfile.close();
 
             cout << "\nAppointment made successfully\n" << "Appointment ID is : "<<a.A_id<<"\n\n";
+
+            current_seats = current_seats -1 ;
 
         }
         else {

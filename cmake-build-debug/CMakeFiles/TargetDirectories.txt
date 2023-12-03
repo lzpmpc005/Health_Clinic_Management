@@ -1,3 +1,3 @@
-/Users/charton/Desktop/Health_Clinic_Management-main/cmake-build-debug/CMakeFiles/Health_Clinic_Management_main.dir
-/Users/charton/Desktop/Health_Clinic_Management-main/cmake-build-debug/CMakeFiles/edit_cache.dir
-/Users/charton/Desktop/Health_Clinic_Management-main/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/charton/Git/Health_Clinic_Management/cmake-build-debug/CMakeFiles/Health_Clinic_Management_main.dir
+/Users/charton/Git/Health_Clinic_Management/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/charton/Git/Health_Clinic_Management/cmake-build-debug/CMakeFiles/rebuild_cache.dir
