@@ -45,25 +45,47 @@ public:
     }
 };
 
-void PatientRegister()
-{
+bool valide(const std::string& str) {
+    if (str.empty()) {
+        std::cout << "Error: Input cannot be empty.\n";
+        return false;
+    }
+
+    for (char ch : str) {
+        if (!std::isalnum(ch) && ch != ' ') {
+            std::cout << "Error: Input contains special characters.\n";
+            return false;
+        }
+    }
+
+    return true; // No special characters or empty string
+}
+
+void PatientRegister() {
+
     ofstream outfile("patients.txt", ios::app);
 
     Patient p;
 
     if (outfile.is_open()) {
 
-        srand(time(NULL)); //generate a 7-digit id
+        srand(time(NULL)); // generate a 7-digit id
         p.P_id = rand() % 9999999 + 1000000;
 
-        cout << "\nPatient Name: ";
-        cin >> p.P_name;
+        do {
+            cout << "\nPatient Name: ";
+            cin >> p.P_name;
+        } while (!valide(p.P_name));
 
-        cout << "Patient Address: ";
-        cin >> p.P_address;
+        do {
+            cout << "Patient Address: ";
+            cin >> p.P_address;
+        } while (!valide(p.P_address));
 
-        cout << "Patient Medical History: ";
-        cin >> p.P_history;
+        do {
+            cout << "Patient Medical History: ";
+            cin >> p.P_history;
+        } while (!valide(p.P_history));
 
         outfile << p;
         outfile.close();
@@ -73,8 +95,8 @@ void PatientRegister()
         cout << "Unable to open file.\n";
     }
 
-    cout << "\nPatient Registered successfully\n" << "Patient ID is : "<<p.P_id<<"\n\n";
-    }
+    cout << "\nPatient Registered successfully\n" << "Patient ID is : " << p.P_id << "\n\n";
+}
 
 // Read data from patient.txt
 vector<Patient> ReadPatientsFromFile() {
