@@ -1,0 +1,8 @@
+Package: boost-smart-ptr
+Version: 1.83.0
+Depends: boost-assert, boost-config, boost-core, boost-move, boost-static-assert, boost-throw-exception, boost-type-traits, boost-vcpkg-helpers
+Architecture: x64-windows
+Multi-Arch: same
+Abi: 0bc4176bad147f296d988edf928c6e53af4e9380c50baad52ad8ff6d52df57f5
+Description: Boost smart_ptr module
+Status: install ok installed

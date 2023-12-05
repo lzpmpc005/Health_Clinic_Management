@@ -1,0 +1,8 @@
+Package: boost-move
+Version: 1.83.0
+Depends: boost-config, boost-vcpkg-helpers
+Architecture: x64-windows
+Multi-Arch: same
+Abi: 9ff09792f96dda493f0dfea8e6f9d2b7178528e689785a02df235de2d75cdd7c
+Description: Boost move module
+Status: install ok half-installed

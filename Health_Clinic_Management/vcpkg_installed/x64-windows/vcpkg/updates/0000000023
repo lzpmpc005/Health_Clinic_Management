@@ -1,0 +1,8 @@
+Package: boost-core
+Version: 1.83.0
+Depends: boost-assert, boost-config, boost-static-assert, boost-throw-exception, boost-vcpkg-helpers
+Architecture: x64-windows
+Multi-Arch: same
+Abi: 34bf56c1f10cb6543e513e44ba9a1671e22f58a98d9c5c40f0c15ad208523414
+Description: Boost core module
+Status: install ok installed

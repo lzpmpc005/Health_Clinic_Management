@@ -1,3 +1,0 @@
-10175369,patient,null,null
-6277307,patient2,null,null
-9958704,patient3,null,null

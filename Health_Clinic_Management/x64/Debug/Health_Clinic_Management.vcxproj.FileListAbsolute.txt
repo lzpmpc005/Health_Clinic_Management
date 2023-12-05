@@ -1,1 +1,4 @@
 E:\LU_Leipzig\ProgramClinic\Health_Clinic_Management\Health_Clinic_Management\x64\Debug\Health_Clinic_Management.exe
+E:\LU_Leipzig\ProgramClinic\Health_Clinic_Management\Health_Clinic_Management\Health_Clinic_Management\x64\Debug\Health_Clinic_Management.vcxproj.CopyComplete
+E:\LU_Leipzig\ProgramClinic\Health_Clinic_Management\Health_Clinic_Management\Health_Clinic_Management\x64\Debug\Health_Clinic_Management.exe
+E:\LU_Leipzig\ProgramClinic\Health_Clinic_Management\Health_Clinic_Management\Health_Clinic_Management\x64\Debug\sqlite3.dll

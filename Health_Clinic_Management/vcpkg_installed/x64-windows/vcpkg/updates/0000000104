@@ -1,0 +1,8 @@
+Package: boost-context
+Version: 1.83.0
+Depends: boost-assert, boost-build, boost-config, boost-core, boost-modular-build-helper, boost-mp11, boost-pool, boost-predef, boost-smart-ptr, boost-vcpkg-helpers, vcpkg-cmake
+Architecture: x64-windows
+Multi-Arch: same
+Abi: 0c816d5b93820a13b15afb26c4a0009322d69732a76fe3d88e26f758bc790e5d
+Description: Boost context module
+Status: install ok half-installed

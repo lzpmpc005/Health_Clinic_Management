@@ -1,280 +1,292 @@
 #include <iostream>
-#include <vector>
-#include <fstream>
 #include <cstdlib>
 #include <ctime>
-#include <sstream>
+#include <crow.h>
+#include <sqlite3.h>
+#include <vector>
 
 using namespace std;
+using namespace crow;
 
-// Structure the data of Patient 
 class Patient {
 public:
-    int P_id{};
+    int P_id;
     string P_name;
     string P_address;
     string P_history;
 
-    friend ostream& operator<<(ostream & out, Patient & p) {
-        out << p.P_id << "," << p.P_name << "," << p.P_address << "," << p.P_history << "\n";
-
-        return out;
-    }
-
-    friend istream& operator>>(istream& in, Patient& p) {
-        char comma; // to read the comma
-        in >> p.P_id >> comma >> p.P_name >> comma >> p.P_address >> comma >> p.P_history;
-
-        return in;
-    }
-
+    Patient(int id, string name, string address, string history) : P_id(id), P_name(name), P_address(address), P_history(history) {}
 };
 
-// Structure the data of Appointment
-class Appointment {
+
+class Doctor {
 public:
-    int A_id{};
-    int P_id{};
-    string P_name;
-    string Comments;
+    int D_id;
+    string D_name;
+    string D_specialization;
+    vector<int> availableSlots;
 
-    friend ostream& operator<<(ostream & out, Appointment & a) {
-        out << a.A_id << "," << a.P_id << "," << a.P_name << "," << a.Comments << "\n";
-
-        return out;
+    Doctor(int id, string name, string specialization) : D_id(id), D_name(name), D_specialization(specialization) {
+        // Initialize available slots
+        for (int i = 9; i <= 18; ++i) {
+            availableSlots.push_back(i);
+        }
     }
 };
 
-bool valide(const std::string& str) {
-    if (str.empty()) {
-        std::cout << "Error: Input cannot be empty.\n";
-        return false;
-    }
 
-    for (char ch : str) {
-        if (!std::isalnum(ch) && ch != ' ') {
-            std::cout << "Error: Input contains special characters.\n";
-            return false;
-        }
-    }
-
-    return true; // No special characters or empty string
+int Generate_id() {
+    srand(time(NULL));
+    int id = rand() % 9999999 + 1000000;
+    return id;
 }
 
-void PatientRegister() {
+void register_patient(Patient& p) {
+    sqlite3* db;
+    sqlite3_open("patients.db", &db);
 
-    ofstream outfile("patients.txt", ios::app);
+    string sql = "CREATE TABLE IF NOT EXISTS patients (id INTEGER PRIMARY KEY, name TEXT, address TEXT, history TEXT);";
+    sqlite3_exec(db, sql.c_str(), NULL, NULL, NULL);
 
-    Patient p;
+    sql = "INSERT INTO patients (id, name, address, history) VALUES (" + to_string(p.P_id) + ", '" + p.P_name + "', '" + p.P_address + "', '" + p.P_history + "');";
+    sqlite3_exec(db, sql.c_str(), NULL, NULL, NULL);
 
-    if (outfile.is_open()) {
-
-        srand(time(NULL)); // generate a 7-digit id
-        p.P_id = rand() % 9999999 + 1000000;
-
-        do {
-            cout << "\nPatient Name: ";
-            cin >> p.P_name;
-        } while (!valide(p.P_name));
-
-        do {
-            cout << "Patient Address: ";
-            cin >> p.P_address;
-        } while (!valide(p.P_address));
-
-        do {
-            cout << "Patient Medical History: ";
-            cin >> p.P_history;
-        } while (!valide(p.P_history));
-
-        outfile << p;
-        outfile.close();
-    }
-
-    else {
-        cout << "Unable to open file.\n";
-    }
-
-    cout << "\nPatient Registered successfully\n" << "Patient ID is : " << p.P_id << "\n\n";
+    sqlite3_close(db);
 }
 
-// Read data from patient.txt
-vector<Patient> ReadPatientsFromFile() {
-    vector<Patient> patients;
-    ifstream infile("patients.txt");
-    Patient p;
+json::wvalue print_patients() {
+    sqlite3* db;
+    sqlite3_stmt* stmt;
 
-    if (infile.is_open()) {
-        string line;
-        while (getline(infile, line)) {
-            stringstream ss(line);
-            char comma; // to read the comma
-            ss >> p.P_id >> comma >> p.P_name >> comma >> p.P_address >> comma >> p.P_history;
-            patients.push_back(p);
-        }
-        infile.close();
-    } else {
-        cout << "Unable to open file.\n";
+    sqlite3_open("patients.db", &db);
+
+    string sql = "SELECT * FROM patients ORDER BY name;";
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
+
+    json::wvalue patients;
+    int index = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int id = sqlite3_column_int(stmt, 0);
+        string name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+        string address = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+        string history = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+
+        patients[index]["id"] = id;
+        patients[index]["name"] = name;
+        patients[index]["address"] = address;
+        patients[index]["history"] = history;
+        index++;
     }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
 
     return patients;
 }
 
-vector<Appointment> ReadAppointmentsFromFile() {
-    vector<Appointment> appointments;
-    ifstream infile("appointments.txt");
-    Appointment a;
+void register_doctor(Doctor& d) {
+    sqlite3* db;
+    sqlite3_open("doctors.db", &db);
 
-    if (infile.is_open()) {
-        string line;
-        while (getline(infile, line)) {
-            stringstream ss(line);
-            char comma;
-            ss >> a.A_id >> comma >> a.P_id >> comma >> a.P_name >> comma >> a.Comments;
-            appointments.push_back(a);
-        }
-        infile.close();
-    }
-    else {
-        cout << "Unable to open file.\n";
-    }
+    string sql = "CREATE TABLE IF NOT EXISTS doctors (id INTEGER PRIMARY KEY, name TEXT, specialization TEXT);";
+    sqlite3_exec(db, sql.c_str(), NULL, NULL, NULL);
 
-    return appointments;
+    sql = "INSERT INTO doctors (id, name, specialization) VALUES (" + to_string(d.D_id) + ", '" + d.D_name + "', '" + d.D_specialization + "');";
+    sqlite3_exec(db, sql.c_str(), NULL, NULL, NULL);
+
+    sqlite3_close(db);
 }
 
-// Make an appointment by Patient ID, current seats <= 10
-int Booked_Seats() {
-    ifstream infile("appointments.txt");
-    if (!infile) {
-        cout << "Can't open 'appointments.txt'" << endl;
-        return 10000; 
+json::wvalue print_doctors() {
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+
+    sqlite3_open("doctors.db", &db);
+
+    string sql = "SELECT * FROM doctors ORDER BY name;";
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
+
+    json::wvalue doctors;
+    int index = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int id = sqlite3_column_int(stmt, 0);
+        string name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+        string specialization = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+
+        doctors[index]["id"] = id;
+        doctors[index]["name"] = name;
+        doctors[index]["specialization"] = specialization;
+        index++;
     }
 
-    int booked_seats = 0;
-    string line;
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
 
-    while (getline(infile, line)) {
-        booked_seats++;
-    }
-
-    infile.close();
-
-    return booked_seats;
-}
-
-
-bool PatientExists(int P_ID) {
-    vector<Patient> patients = ReadPatientsFromFile();
-    Appointment a;
-    Patient p;
-    bool PatientExists = false;
-    for (const Patient& p : patients) {
-        if (p.P_id == P_ID) {
-            PatientExists = true;
-            break;
-        }
-    }
-    return PatientExists;
+    return doctors;
 }
 
 
-bool NotBookedAlready(int P_ID) {
-    vector<Appointment> appointments = ReadAppointmentsFromFile();
-    Appointment a;
-    bool NotBookedAlready = true;
-    for (const Appointment& a : appointments) {
-        if (a.P_id == P_ID) {
-            NotBookedAlready = false;
-            break;
-        }
+Doctor get_doctor(int doctorId) {
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+
+    sqlite3_open("doctors.db", &db);
+
+    string sql = "SELECT * FROM doctors WHERE id = " + to_string(doctorId) + ";";
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
+
+    Doctor doctor(0, "", "");
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        doctor.D_id = sqlite3_column_int(stmt, 0);
+        doctor.D_name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+        doctor.D_specialization = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
     }
-    return NotBookedAlready;
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    return doctor;
 }
 
-void MakeAppointment(){
-    vector<Patient> patients = ReadPatientsFromFile();
-    vector<Appointment> appointments = ReadAppointmentsFromFile();
-    Appointment a;
-    Patient p;
+bool patientExists(sqlite3* db, int patientId) {
+    string sql = "SELECT * FROM patients WHERE id = " + to_string(patientId) + ";";
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
 
-    // Check if current seats enough
-    int total_seats = 10;
-    int current_seats = total_seats - Booked_Seats();
-    if (current_seats <= 0) {
-        cout << "No available seats for appointment. Please try again later.\n";
-        return;
-    }
+    bool exists = (sqlite3_step(stmt) == SQLITE_ROW);
 
-    // Check if Patient ID exists
-    int PatientID;
-    cout << "Remaining seats: " << current_seats << "\n";
-    cout << "Enter Patient ID for appointment: ";
-    cin >> PatientID;
+    sqlite3_finalize(stmt);
 
-    if (!PatientExists(PatientID)) {
-        cout << "Patient ID not found. Please register first.\n";
-        return;
-    }
-
-    for (const Patient& p : patients) {
-        if (p.P_id == PatientID) {
-            a.P_id = p.P_id;
-            a.P_name = p.P_name;
-            break;
-        }
-    }
-
-    if (NotBookedAlready(PatientID)) {
-        
-        ofstream outfile("appointments.txt", ios::app);
-        if (outfile.is_open()) {
-            srand(time(NULL)); 
-            a.A_id = rand() % 9999999 + 1000000;
-
-            cout << "Additional Comments: ";
-            cin >> a.Comments;
-
-            outfile << a;
-            outfile.close();
-
-            cout << "\nAppointment made successfully\n" << "Appointment ID is : "<<a.A_id<<"\n\n";
-
-            current_seats = current_seats -1 ;
-
-        }
-        else {
-            cout << "Unable to open file.\n";
-        }
-    }
-    else{
-        cout << "Patient ID already made an appointment.\n";
-    }
+    return exists;
 }
 
-int main(){
-m:
-    cout << "\n\t\t\t Select Function: ";
-	cout << "\n\n1) REGISTER";
-	cout << "\n2) MAKE APPOINTMENT";
-	cout << "\n3) Exit";
 
-	cout << "\n\n Please Enter Your Choice: ";
-	int choice;
-	cin >> choice;
+int make_appointment_with_doctor(int patientId, int doctorId, int slot) {
+    sqlite3* db;
+    sqlite3_open("appointments.db", &db);
 
-	switch (choice) {
-	case 1:
-        PatientRegister();
-		break;
-	case 2:
-        MakeAppointment();
-		break;
-	case 3:
-		exit(0);
-	default:
-		cout << "\n Please Select Right Number!";
-	}
-	goto m;
-    
+    if (!patientExists(db, patientId)) {
+        sqlite3_close(db);
+        return -1;
+    }
+
+    Doctor doctor = get_doctor(doctorId);
+    auto it = find(doctor.availableSlots.begin(), doctor.availableSlots.end(), slot);
+
+    if (it == doctor.availableSlots.end()) {
+        sqlite3_close(db);
+        return -1;
+    }
+
+    string sql = "SELECT * FROM appointments WHERE doctor_id = " + to_string(doctorId) + " AND slot = " + to_string(slot) + ";";
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return -1;
+    }
+
+    sqlite3_finalize(stmt);
+
+    doctor.availableSlots.erase(it); // remove booked slot to avoid double booked
+
+    sql = "CREATE TABLE IF NOT EXISTS appointments (patient_id INTEGER, doctor_id INTEGER, slot INTEGER);";
+    sqlite3_exec(db, sql.c_str(), NULL, NULL, NULL);
+
+    sql = "INSERT INTO appointments (patient_id, doctor_id, slot) VALUES (" + to_string(patientId) + ", " + to_string(doctorId) + ", " + to_string(slot) + ");";
+    sqlite3_exec(db, sql.c_str(), NULL, NULL, NULL);
+
+    sqlite3_close(db);
+
     return 0;
+}
+
+
+int main() {
+    SimpleApp hcm;
+
+    CROW_ROUTE(hcm, "/register_patient").methods("POST"_method)
+        ([](const request& req) {
+        auto data = json::load(req.body);
+        if (!data || !data.has("name") || !data.has("address") || !data.has("history")) {
+            return response(400, "Invalid data");
+        }
+
+        string name = data["name"].s();
+        string address = data["address"].s();
+        string history = data["history"].s();
+        int id = Generate_id();
+
+        Patient patient(id, name, address, history);
+
+        register_patient(patient);
+
+        json::wvalue response_data;
+        response_data["id"] = id;
+        response_data["message"] = "Patient Successfully Registered";
+
+        return response(200, response_data);
+            });
+
+    CROW_ROUTE(hcm, "/patients").methods("GET"_method)
+        ([](const request& req) {
+        return response(200, print_patients().dump());
+            });
+
+    CROW_ROUTE(hcm, "/register_doctor").methods("POST"_method)
+        ([](const request& req) {
+        auto data = json::load(req.body);
+        if (!data || !data.has("name") || !data.has("specialization")) {
+            return response(400, "Invalid data");
+        }
+
+        string name = data["name"].s();
+        string specialization = data["specialization"].s();
+        int id = Generate_id();
+
+        Doctor doctor(id, name, specialization);
+
+        register_doctor(doctor);
+
+        json::wvalue response_data;
+        response_data["id"] = id;
+        response_data["message"] = "Doctor Successfully Registered";
+
+        return response(200, response_data);
+            });
+
+    CROW_ROUTE(hcm, "/doctors").methods("GET"_method)
+        ([](const request& req) {
+        return response(200, print_doctors().dump());
+            });
+
+    CROW_ROUTE(hcm, "/make_appointment").methods("POST"_method)
+        ([&](const request& req) {
+        auto data = json::load(req.body);
+        if (!data || !data.has("patient_id") || !data.has("doctor_id") || !data.has("slot")) {
+            return response(400, "Invalid data");
+        }
+
+        int patientId = data["patient_id"].i();
+        int doctorId = data["doctor_id"].i();
+        int slot = data["slot"].i();
+
+        int result = make_appointment_with_doctor(patientId, doctorId, slot);
+
+        if (result == -1) {
+            return response(400, "Slot not available or already booked");
+        }
+
+        json::wvalue response_data;
+        response_data["patient_id"] = patientId;
+        response_data["doctor_id"] = doctorId;
+        response_data["slot"] = slot;
+        response_data["message"] = "Appointment Successfully Made";
+
+        return response(200, response_data);
+            });
+
+    hcm.bindaddr("127.0.0.1").port(18080).run();
 }
