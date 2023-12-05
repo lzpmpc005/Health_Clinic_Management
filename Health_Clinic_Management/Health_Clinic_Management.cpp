@@ -120,15 +120,86 @@ vector<Patient> ReadPatientsFromFile() {
     return patients;
 }
 
-// Make an appointment by Patient ID, current seats <= 10
-int current_seats = 10 ;
+vector<Appointment> ReadAppointmentsFromFile() {
+    vector<Appointment> appointments;
+    ifstream infile("appointments.txt");
+    Appointment a;
 
-void MakeAppointment(vector<Patient>& patients)
-{
+    if (infile.is_open()) {
+        string line;
+        while (getline(infile, line)) {
+            stringstream ss(line);
+            char comma;
+            ss >> a.A_id >> comma >> a.P_id >> comma >> a.P_name >> comma >> a.Comments;
+            appointments.push_back(a);
+        }
+        infile.close();
+    }
+    else {
+        cout << "Unable to open file.\n";
+    }
+
+    return appointments;
+}
+
+// Make an appointment by Patient ID, current seats <= 10
+int Booked_Seats() {
+    ifstream infile("appointments.txt");
+    if (!infile) {
+        cout << "Can't open 'appointments.txt'" << endl;
+        return 10000; 
+    }
+
+    int booked_seats = 0;
+    string line;
+
+    while (getline(infile, line)) {
+        booked_seats++;
+    }
+
+    infile.close();
+
+    return booked_seats;
+}
+
+
+bool PatientExists(int P_ID) {
+    vector<Patient> patients = ReadPatientsFromFile();
+    Appointment a;
+    Patient p;
+    bool PatientExists = false;
+    for (const Patient& p : patients) {
+        if (p.P_id == P_ID) {
+            PatientExists = true;
+            break;
+        }
+    }
+    return PatientExists;
+}
+
+
+bool NotBookedAlready(int P_ID) {
+    vector<Appointment> appointments = ReadAppointmentsFromFile();
+    Appointment a;
+    bool NotBookedAlready = true;
+    for (const Appointment& a : appointments) {
+        if (a.P_id == P_ID) {
+            NotBookedAlready = false;
+            break;
+        }
+    }
+    return NotBookedAlready;
+}
+
+void MakeAppointment(){
+    vector<Patient> patients = ReadPatientsFromFile();
+    vector<Appointment> appointments = ReadAppointmentsFromFile();
     Appointment a;
     Patient p;
 
     // Check if current seats enough
+    int total_seats = 10;
+    int current_seats = total_seats - Booked_Seats();
     if (current_seats <= 0) {
         cout << "No available seats for appointment. Please try again later.\n";
         return;
@@ -140,22 +211,24 @@ void MakeAppointment(vector<Patient>& patients)
     cout << "Enter Patient ID for appointment: ";
     cin >> PatientID;
 
-    bool PatientExists = false;
+    if (!PatientExists(PatientID)) {
+        cout << "Patient ID not found. Please register first.\n";
+        return;
+    }
+
     for (const Patient& p : patients) {
         if (p.P_id == PatientID) {
-            PatientExists = true;
             a.P_id = p.P_id;
             a.P_name = p.P_name;
             break;
         }
     }
 
-    // If Patient Exist Make Appointment Else Return Error
-    if (PatientExists) {
-        //Write appointment logs into file
+    if (NotBookedAlready(PatientID)) {
+        
         ofstream outfile("appointments.txt", ios::app);
         if (outfile.is_open()) {
-            srand(time(NULL)); // generate a unique appointment ID
+            srand(time(NULL)); 
             a.A_id = rand() % 9999999 + 1000000;
 
             cout << "Additional Comments: ";
@@ -174,16 +247,13 @@ void MakeAppointment(vector<Patient>& patients)
         }
     }
     else{
-        cout << "Patient ID not found. Please register first.\n";
+        cout << "Patient ID already made an appointment.\n";
     }
 }
 
-int main()
-{
-    vector<Patient> patients = ReadPatientsFromFile();
-
+int main(){
 m:
-	cout << "\n\t\t\t Select Function: ";
+    cout << "\n\t\t\t Select Function: ";
 	cout << "\n\n1) REGISTER";
 	cout << "\n2) MAKE APPOINTMENT";
 	cout << "\n3) Exit";
@@ -197,7 +267,7 @@ m:
         PatientRegister();
 		break;
 	case 2:
-        MakeAppointment(patients);
+        MakeAppointment();
 		break;
 	case 3:
 		exit(0);
