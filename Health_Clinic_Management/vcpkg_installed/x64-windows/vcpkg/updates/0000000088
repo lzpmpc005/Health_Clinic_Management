@@ -1,8 +1,0 @@
-Package: boost-tokenizer
-Version: 1.83.0
-Depends: boost-assert, boost-config, boost-core, boost-iterator, boost-throw-exception, boost-type-traits, boost-vcpkg-helpers
-Architecture: x64-windows
-Multi-Arch: same
-Abi: 0a465337d1690c6c5cb7617653c5d6f7596e28334612c0cf94df1b1a43584e50
-Description: Boost tokenizer module
-Status: install ok half-installed

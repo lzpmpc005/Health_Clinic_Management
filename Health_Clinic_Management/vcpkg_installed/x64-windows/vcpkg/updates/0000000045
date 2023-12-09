@@ -1,8 +1,0 @@
-Package: boost-integer
-Version: 1.83.0
-Depends: boost-assert, boost-config, boost-core, boost-static-assert, boost-throw-exception, boost-type-traits, boost-vcpkg-helpers
-Architecture: x64-windows
-Multi-Arch: same
-Abi: 279619422395c844278efd44bd4ca2d204ff64af14b74d1db6dd3487d11924ac
-Description: Boost integer module
-Status: install ok installed

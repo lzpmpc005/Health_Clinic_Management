@@ -1,8 +1,0 @@
-Package: boost-rational
-Version: 1.83.0
-Depends: boost-assert, boost-config, boost-core, boost-integer, boost-static-assert, boost-throw-exception, boost-type-traits, boost-utility, boost-vcpkg-helpers
-Architecture: x64-windows
-Multi-Arch: same
-Abi: 3ad1b29e494e9737083239e65cc0f4a452c81c61eeb384ab1758c4d8085552d4
-Description: Boost rational module
-Status: install ok half-installed

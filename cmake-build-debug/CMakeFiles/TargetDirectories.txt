@@ -1,0 +1,3 @@
+/Users/charton/Git/Health_Clinic_Management_Web/cmake-build-debug/CMakeFiles/Health_Clinic_Management_Web.dir
+/Users/charton/Git/Health_Clinic_Management_Web/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/charton/Git/Health_Clinic_Management_Web/cmake-build-debug/CMakeFiles/rebuild_cache.dir
