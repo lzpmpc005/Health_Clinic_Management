@@ -364,7 +364,7 @@ int make_appointment_with_doctor(int patientId, int doctorId, const string& date
         return -4;
     }
 
-    if (period == "AM" || period == "PM") {
+    if (period == "9-11" || period == "11-13" || period == "13-15" || period == "15-17") {
         doctor.addAppointment(date, patientId, period);
     }
     else {
@@ -598,7 +598,7 @@ int main() {
             response_data["error_message"] = "Doctor " + get_doctor(doctorId).D_name + " is not available on " + date + " " + period;
         }
         else if (result == -5) {
-            response_data["error_message"] = "Invalid Period! Please choose AM or PM !";
+            response_data["error_message"] = "Invalid Period! Please choose from [9-11, 11-13, 13-15, 15-17] !";
         }
         else {
             response_data["message"] = "Appointment Successfully Made";
