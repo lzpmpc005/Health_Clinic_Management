@@ -48,7 +48,6 @@ public:
         string key = date + " " + period;
         P_MedicalHistory[key].emplace_back(doctorId, doctorName, prescription);
     }
-
 };
 class MedicalHistory {
 public:
@@ -56,9 +55,12 @@ public:
     int D_id;
     string M_date;
     string M_prescription;
+    int M_timeCost;
+    double M_examinationFee;
+    string M_medication;
 
-    MedicalHistory(int patientID, int doctorID, const string& date, const string& prescription)
-        : P_id(patientID), D_id(doctorID), M_date(date), M_prescription(prescription) {}
+    MedicalHistory(int patientID, int doctorID, const string& date, const string& prescription, int timeCost, double examinationFee, const string& medication)
+        : P_id(patientID), D_id(doctorID), M_date(date), M_prescription(prescription), M_timeCost(timeCost), M_examinationFee(examinationFee), M_medication(medication) {}
 };
 class Appointment {
 public:
@@ -102,6 +104,9 @@ void createTables(sqlite3* db) {
         "doctorID INTEGER,"
         "date TEXT NOT NULL,"
         "prescription TEXT,"
+        "timeCost INTEGER,"
+        "examinationFee DOUBLE,"
+        "medication TEXT,"
         "FOREIGN KEY(patientID) REFERENCES patient(id),"
         "FOREIGN KEY(doctorID) REFERENCES doctor(id));";
 
@@ -209,7 +214,6 @@ bool areSlotsAvailable(int doctorID, const string& date, const string& period) {
     return false;
 }
 
-
 void register_doctor(Doctor& d) {
     sqlite3* db;
     sqlite3_open("clinic.db", &db);
@@ -229,7 +233,6 @@ void register_doctor(Doctor& d) {
 
     sqlite3_close(db);
 }
-
 
 Doctor get_doctor(int doctorId) {
     sqlite3* db;
@@ -270,7 +273,6 @@ int getPatientId(sqlite3* db, const string& phone) {
 
     return existingPatientId;
 }
-
 
 int register_patient(Patient& p, int& existingPatientId) {
     sqlite3* db;
@@ -326,31 +328,7 @@ Patient get_patient(int patientId) {
     return patient;
 }
 
-
-vector<MedicalHistory> get_medical_history(int patientId) {
-    sqlite3* db;
-    sqlite3_stmt* stmt;
-
-    sqlite3_open("clinic.db", &db);
-
-    string sql = "SELECT * FROM medical_history WHERE patientID = " + to_string(patientId) + ";";
-    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
-
-    vector<MedicalHistory> medicalHistory;
-
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        int doctorId = sqlite3_column_int(stmt, 1);
-        string date = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
-        string prescription = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-        medicalHistory.emplace_back(patientId, doctorId, date, prescription);
-    }
-
-    sqlite3_finalize(stmt);
-    sqlite3_close(db);
-
-    return medicalHistory;
-}
-
+vector<MedicalHistory> get_medical_history(int patientId);
 
 crow::json::wvalue print_patients() {
     sqlite3* db;
@@ -394,7 +372,6 @@ crow::json::wvalue print_patients() {
     return patients;
 }
 
-
 crow::json::wvalue print_doctors() {
     sqlite3* db;
     sqlite3_stmt* stmt;
@@ -424,11 +401,9 @@ crow::json::wvalue print_doctors() {
     return doctors;
 }
 
-
 void make_appointment(Appointment& a) {
     sqlite3* db;
     if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
-        cerr << "Can't open database: " << sqlite3_errmsg(db) << endl;
         return;
     }
 
@@ -447,7 +422,6 @@ void make_appointment(Appointment& a) {
 
     sqlite3_close(db);
 }
-
 
 Appointment get_appointment(int patientId) {
     sqlite3* db;
@@ -471,7 +445,6 @@ Appointment get_appointment(int patientId) {
 
     return appointment;
 }
-
 
 crow::json::wvalue print_appointments() {
     sqlite3* db;
@@ -504,20 +477,110 @@ crow::json::wvalue print_appointments() {
     return appointments;
 }
 
-
-void record_medical_history(int patientId, int doctorId, const string& date, const string& prescription) {
+void record_medical_history(int patientId, int doctorId, const string& date, const string& prescription, int timeCost, double examinationFee, const string& medication) {
     sqlite3* db;
     sqlite3_open("clinic.db", &db);
 
     sqlite3_exec(db, "BEGIN;", nullptr, nullptr, nullptr);
 
-    string sql = "INSERT INTO medical_history (patientID, doctorID, date, prescription) VALUES ("
-        + to_string(patientId) + ", " + to_string(doctorId) + ", '" + date + "', '" + prescription + "');";
+    string sql = "INSERT INTO medical_history (patientID, doctorID, date, prescription, timeCost, examinationFee, medication) VALUES ("
+        + to_string(patientId) + ", " + to_string(doctorId) + ", '" + date + "', '" + prescription + "', " + to_string(timeCost) + ", " + to_string(examinationFee) + ", '" + medication + "');";
+
     int result = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr);
 
     sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr);
     sqlite3_close(db);
 }
+
+
+vector<MedicalHistory> get_medical_history(int patientId) {
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+
+    sqlite3_open("clinic.db", &db);
+
+    string sql = "SELECT * FROM medical_history WHERE patientID = " + to_string(patientId) + ";";
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
+
+    vector<MedicalHistory> medicalHistory;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int doctorId = sqlite3_column_int(stmt, 1);
+        string date = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+        string prescription = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+        int timeCost = sqlite3_column_double(stmt, 4);
+        double examinationFee = sqlite3_column_double(stmt, 5);
+        string medication = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
+        medicalHistory.emplace_back(patientId, doctorId, date, prescription, timeCost, examinationFee, medication);
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    return medicalHistory;
+}
+
+double getMedicinePrice(const string& medicineName) {
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+
+    sqlite3_open("medicine.db", &db);
+
+    string sql = "SELECT price FROM price WHERE medicine = ?;";
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
+    sqlite3_bind_text(stmt, 1, medicineName.c_str(), -1, SQLITE_STATIC);
+
+    double medicinePrice = 0.0;
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        medicinePrice = sqlite3_column_double(stmt, 0);
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    return medicinePrice;
+}
+
+double calculateMedicationsCost(const vector<string>& medications) {
+    double medationsCost = 0.0;
+
+    for (const string& medicine : medications) {
+        double medicinePrice = getMedicinePrice(medicine);
+
+        medationsCost += medicinePrice;
+    }
+
+    return medationsCost;
+}
+
+struct Bill {
+    double totalCost;
+    double baseFee;
+    double examinationFee;
+    double medicationsFee;
+};
+
+Bill generateBill(int timeCost, double examinationFee, const std::string& medication) {
+    // Split medications string into individual medications
+    istringstream medicationStream(medication);
+    vector<std::string> medications;
+    string singleMedication;
+    while (getline(medicationStream, singleMedication, ',')) {
+        medications.push_back(singleMedication);
+    }
+
+    double totalMedicationsFee = calculateMedicationsCost(medications);
+
+    Bill bill;
+    bill.baseFee = timeCost * 2.3;
+    bill.examinationFee = examinationFee;
+    bill.medicationsFee = totalMedicationsFee;
+    bill.totalCost = timeCost * 2.3 + examinationFee + totalMedicationsFee;
+
+    return bill;
+}
+
 
 int main() {
     sqlite3* db;
@@ -682,7 +745,7 @@ int main() {
 
     CROW_ROUTE(hcm, "/record_medical_history").methods("POST"_method)([&](const crow::request& req) {
         auto data = crow::json::load(req.body);
-        if (!data || !data.has("patient_id") || !data.has("doctor_id") || !data.has("date") || !data.has("prescription")) {
+        if (!data || !data.has("patient_id") || !data.has("doctor_id") || !data.has("date") || !data.has("prescription") || !data.has("startTime") || !data.has("finishTime") || !data.has("examinationFee") || !data.has("medications")) {
             return crow::response(400, "Invalid data");
         }
 
@@ -690,6 +753,9 @@ int main() {
         int doctorId = data["doctor_id"].i();
         string date = data["date"].s();
         string prescription = data["prescription"].s();
+        int timeCost = data["finishTime"].d() * 100 - data["startTime"].d() * 100;
+        double examinationFee = data["examinationFee"].d();
+        string medication = data["medications"].s();
 
         if (!isValidDate(date)) {
             crow::json::wvalue response_data;
@@ -712,14 +778,28 @@ int main() {
         }
 
         try {
-            record_medical_history(patientId, doctorId, date, prescription);
-            crow::json::wvalue response_data;
-            response_data["message"] = "Medical History Successfully Recorded";
-            response_data["patient_id"] = patientId;
-            response_data["doctor_id"] = doctorId;
-            response_data["date"] = date;
-            response_data["prescription"] = prescription;
-            return crow::response(200, response_data);
+            record_medical_history(patientId, doctorId, date, prescription, timeCost, examinationFee, medication);
+
+            Bill bill = generateBill(timeCost, examinationFee, medication);
+
+            crow::json::wvalue response_data_medical_history;
+            response_data_medical_history["message"] = "Medical History Successfully Recorded";
+            response_data_medical_history["patient_id"] = patientId;
+            response_data_medical_history["doctor_id"] = doctorId;
+            response_data_medical_history["date"] = date;
+            response_data_medical_history["prescription"] = prescription;
+
+            crow::json::wvalue response_data_bill;
+            response_data_bill["message"] = "Bill Details:";
+            response_data_bill["Total Cost"] = bill.totalCost;
+            response_data_bill["Base Fee"] = bill.baseFee;
+            response_data_bill["Examination Fee"] = bill.examinationFee;
+            response_data_bill["Medication Fee"] = bill.medicationsFee;
+
+            crow::response response(200);
+            response.write(response_data_medical_history.dump());
+            response.write(response_data_bill.dump());
+            return response;
         }
         catch (const std::runtime_error& e) {
             return crow::response(500, e.what());
