@@ -34,20 +34,32 @@ public:
         Detail(int id, string name, string description)
             : doctorId(id), doctorName(name), prescription(description) {}
     };
+    struct InsuranceClaims {
+        int claimId;
+        string status;
+        InsuranceClaims(int id, string status)
+            : claimId(id), status(status) {}
+    };
 
     int P_id;
     string P_name;
     string P_address;
     string P_phone;
+    string P_insuranceProvider;
+    string P_insurancePolicyNumber;
     map<string, vector<Detail>> P_MedicalHistory;
+    map<string, vector<InsuranceClaims>> InsuranceClaims;
 
-    Patient(int id, string name, string address, string phone)
-        : P_id(id), P_name(name), P_address(address), P_phone(phone) {}
+
+    Patient(int id, string name, string address, string phone, string insuranceProvider, string insurancePolicyNumber)
+        : P_id(id), P_name(name), P_address(address), P_phone(phone), P_insuranceProvider(insuranceProvider), P_insurancePolicyNumber(insurancePolicyNumber) {}
 
     void addMedicalHistory(const string& date, const string& period, int doctorId, const string& doctorName, const string& prescription) {
         string key = date + " " + period;
         P_MedicalHistory[key].emplace_back(doctorId, doctorName, prescription);
     }
+
+    //void fileInsuranceClaims(const string)
 };
 class MedicalHistory {
 public:
@@ -72,6 +84,18 @@ public:
     Appointment(int patientID, int doctorID, const string& date, const string& period)
         : P_id(patientID), D_id(doctorID), A_date(date), A_period(period) {}
 };
+class InsuranceClaim {
+public:
+    int P_id;
+    int C_id;
+    string C_insuranceProvider;
+    string C_insurancePolicyNumber;
+    string C_status;
+
+    InsuranceClaim(int patientID, int claimID, const string& insuranceProvider, const string& insurancePolicyNumber, const string& status)
+        : P_id(patientID), C_id(claimID), C_insuranceProvider(insuranceProvider), C_insurancePolicyNumber(insurancePolicyNumber), C_status(status) {}
+};
+
 
 void createTables(sqlite3* db) {
     char* errorMessage;
@@ -91,7 +115,9 @@ void createTables(sqlite3* db) {
         "id INTEGER PRIMARY KEY,"
         "name TEXT NOT NULL,"
         "address TEXT,"
-        "phone TEXT NOT NULL);";
+        "phone TEXT NOT NULL,"
+        "insuranceProvider TEXT,"
+        "insurancePolicyNumber TEXT);";
 
     if (sqlite3_exec(db, createPatientTableSQL, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
         cerr << "Error creating Patient table: " << errorMessage << endl;
@@ -126,6 +152,20 @@ void createTables(sqlite3* db) {
 
     if (sqlite3_exec(db, createAppointmentTableSQL, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
         cerr << "Error creating Appointment table: " << errorMessage << endl;
+        sqlite3_free(errorMessage);
+        return;
+    }
+
+    const char* createInsuranceClaimsTableSQL = "CREATE TABLE IF NOT EXISTS insuranceClaims ("
+        "patientID INTEGER,"
+        "claimID INTEGER,"
+        "insuranceProvider TEXT NOT NULL,"
+        "insurancePolicyNumber TEXT NOT NULL,"
+        "status TEXT NOT NULL,"
+        "FOREIGN KEY(patientID) REFERENCES patient(id));";
+
+    if (sqlite3_exec(db, createInsuranceClaimsTableSQL, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
+        cerr << "Error creating InsuranceClaims table: " << errorMessage << endl;
         sqlite3_free(errorMessage);
         return;
     }
@@ -290,7 +330,7 @@ int register_patient(Patient& p, int& existingPatientId) {
     }
 
     sqlite3_exec(db, "BEGIN;", nullptr, nullptr, nullptr);
-    string sql = "INSERT INTO patient (id, name, address, phone) VALUES (" + to_string(p.P_id) + ", '" + p.P_name + "', '" + p.P_address + "', '" + p.P_phone + "');";
+    string sql = "INSERT INTO patient (id, name, address, phone, insuranceProvider, insurancePolicyNumber) VALUES (" + to_string(p.P_id) + ", '" + p.P_name + "', '" + p.P_address + "', '" + p.P_phone + "', '" + p.P_insuranceProvider + "', '" + p.P_insurancePolicyNumber + "');";
     int result = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr);
 
     if (result != SQLITE_OK) {
@@ -314,12 +354,14 @@ Patient get_patient(int patientId) {
     string sql = "SELECT * FROM patient WHERE id = " + to_string(patientId) + ";";
     sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
 
-    Patient patient(0, "", "", "");
+    Patient patient(0, "", "", "", "", "");
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         patient.P_id = sqlite3_column_int(stmt, 0);
         patient.P_name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
         patient.P_address = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
         patient.P_phone = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+        patient.P_insuranceProvider = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+        patient.P_insurancePolicyNumber = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
     }
 
     sqlite3_finalize(stmt);
@@ -330,6 +372,7 @@ Patient get_patient(int patientId) {
 
 vector<MedicalHistory> get_medical_history(int patientId);
 
+// Can print_patients call get_patient?
 crow::json::wvalue print_patients() {
     sqlite3* db;
     sqlite3_stmt* stmt;
@@ -492,7 +535,6 @@ void record_medical_history(int patientId, int doctorId, const string& date, con
     sqlite3_close(db);
 }
 
-
 vector<MedicalHistory> get_medical_history(int patientId) {
     sqlite3* db;
     sqlite3_stmt* stmt;
@@ -561,7 +603,7 @@ struct Bill {
     double medicationsFee;
 };
 
-Bill generateBill(int timeCost, double examinationFee, const std::string& medication) {
+Bill generateBill(int timeCost, double examinationFee, const string& medication) {
     // Split medications string into individual medications
     istringstream medicationStream(medication);
     vector<std::string> medications;
@@ -581,6 +623,110 @@ Bill generateBill(int timeCost, double examinationFee, const std::string& medica
     return bill;
 }
 
+void fileInsuranceClaim(int patientId, const string& insuranceProvider, const string& insurancePolicyNumber, const string& prescription, Bill& bill)
+{
+    sqlite3* db;
+    if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
+        return;
+    }
+
+    int C_id = Generate_id();
+    string status = "Submitted";
+
+    sqlite3_exec(db, "BEGIN;", nullptr, nullptr, nullptr);
+
+    string sql = "INSERT INTO insuranceClaims (patientID, claimID, insuranceProvider, insurancePolicyNumber, status) VALUES (" + to_string(patientId) + ", " + to_string(C_id) + ", '" + insuranceProvider + "', '" + insurancePolicyNumber + "', '" + status + "');";
+    int result = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr);
+
+    if (result != SQLITE_OK) {
+        sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+    }
+    else {
+        sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr);
+    }
+
+    sqlite3_close(db);
+}
+
+void updateInsuranceClaim(int claimId, const string& status)
+{
+    sqlite3* db;
+    if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
+        return;
+    }
+
+    sqlite3_exec(db, "BEGIN;", nullptr, nullptr, nullptr);
+
+    string sql = "UPDATE insuranceClaims SET status = '" + status + "' WHERE claimID = " + to_string(claimId) + ";";
+
+    int result = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr);
+
+    if (result != SQLITE_OK) {
+        sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+    }
+    else {
+        sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr);
+    }
+
+    sqlite3_close(db);
+}
+
+InsuranceClaim get_claim(int claimId) {
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+
+    sqlite3_open("clinic.db", &db);
+
+    string sql = "SELECT * FROM insuranceClaims WHERE claimID = " + to_string(claimId) + ";";
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
+
+    InsuranceClaim claim(0, 0, "", "", "");
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        claim.P_id = sqlite3_column_int(stmt, 0);
+        claim.C_id = sqlite3_column_int(stmt, 1);
+        claim.C_insuranceProvider = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+        claim.C_insurancePolicyNumber = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+        claim.C_status = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    return claim;
+}
+
+crow::json::wvalue print_insuranceClaims() {
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+
+    sqlite3_open("clinic.db", &db);
+
+    string sql = "SELECT * FROM insuranceClaims ORDER BY patientID;";
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
+
+    crow::json::wvalue claims;
+    int index = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int P_id = sqlite3_column_int(stmt, 0);
+        int C_id = sqlite3_column_int(stmt, 1);
+        string C_insuranceProvider = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+        string C_insurancePolicyNumber = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+        string C_status = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+
+        claims[index]["patientID"] = P_id;
+        claims[index]["claimID"] = C_id;
+        claims[index]["insuranceProvider"] = C_insuranceProvider;
+        claims[index]["insurancePolicyNumber"] = C_insurancePolicyNumber;
+        claims[index]["status"] = C_status;
+
+        index++;
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    return claims;
+}
 
 int main() {
     sqlite3* db;
@@ -595,7 +741,7 @@ int main() {
 
     CROW_ROUTE(hcm, "/register_patient").methods("POST"_method)([&](const crow::request& req) {
         auto data = crow::json::load(req.body);
-        if (!data || !data.has("name") || !data.has("address") || !data.has("phone")) {
+        if (!data || !data.has("name") || !data.has("address") || !data.has("phone") || !data.has("insuranceProvider") || !data.has("insurancePolicyNumber")) {
             return crow::response(400, "Invalid data");
         }
 
@@ -603,6 +749,8 @@ int main() {
         string name = data["name"].s();
         string address = data["address"].s();
         string phone = data["phone"].s();
+        string insuranceProvider = data["insuranceProvider"].s();
+        string insurancePolicyNumber = data["insurancePolicyNumber"].s();
 
         int existingPatientId;
 
@@ -610,7 +758,7 @@ int main() {
             return crow::response(400, "Invalid name! Only letters and space and 20 characters most.");
         }
 
-        Patient patient(id, name, address, phone);
+        Patient patient(id, name, address, phone, insuranceProvider, insurancePolicyNumber);
 
         int result = register_patient(patient, existingPatientId);
 
@@ -634,10 +782,9 @@ int main() {
         return crow::response(200, response_data);
         });
 
-    CROW_ROUTE(hcm, "/patients").methods("GET"_method)
-        ([](const crow::request& req) {
+    CROW_ROUTE(hcm, "/patients").methods("GET"_method)([](const crow::request& req) {
         return crow::response(200, print_patients().dump());
-            });
+        });
 
     CROW_ROUTE(hcm, "/register_doctor").methods("POST"_method)([](const crow::request& req) {
         auto data = crow::json::load(req.body);
@@ -770,6 +917,7 @@ int main() {
             return crow::response(400, response_data);
         }
 
+
         Doctor doctor = get_doctor(doctorId);
         if (doctor.D_id == 0) {
             crow::json::wvalue response_data;
@@ -780,8 +928,6 @@ int main() {
         try {
             record_medical_history(patientId, doctorId, date, prescription, timeCost, examinationFee, medication);
 
-            Bill bill = generateBill(timeCost, examinationFee, medication);
-
             crow::json::wvalue response_data_medical_history;
             response_data_medical_history["message"] = "Medical History Successfully Recorded";
             response_data_medical_history["patient_id"] = patientId;
@@ -789,16 +935,32 @@ int main() {
             response_data_medical_history["date"] = date;
             response_data_medical_history["prescription"] = prescription;
 
+            Bill bill = generateBill(timeCost, examinationFee, medication);
+
             crow::json::wvalue response_data_bill;
-            response_data_bill["message"] = "Bill Details:";
+            response_data_bill["Bill"] = "Generated";
             response_data_bill["Total Cost"] = bill.totalCost;
             response_data_bill["Base Fee"] = bill.baseFee;
             response_data_bill["Examination Fee"] = bill.examinationFee;
             response_data_bill["Medication Fee"] = bill.medicationsFee;
 
+
+            crow::json::wvalue response_data_InsuranceClaim;
+            if (patient.P_insuranceProvider.empty())
+            {
+                response_data_InsuranceClaim["Insurance Claim"] = "No Insurance Provider found!";
+            }
+            else
+            {
+                fileInsuranceClaim(patientId, patient.P_insuranceProvider, patient.P_insurancePolicyNumber, prescription, bill);
+                response_data_InsuranceClaim["Insurance Claim"] = "Submitted!";
+            }
+
+
             crow::response response(200);
             response.write(response_data_medical_history.dump());
             response.write(response_data_bill.dump());
+            response.write(response_data_InsuranceClaim.dump());
             return response;
         }
         catch (const std::runtime_error& e) {
@@ -843,6 +1005,33 @@ int main() {
         }
 
         return crow::response(200, response_data);
+        });
+
+    CROW_ROUTE(hcm, "/update_insurance_claim").methods("POST"_method)([](const crow::request& req) {
+        auto data = crow::json::load(req.body);
+        if (!data || !data.has("claimID") || !data.has("status")) {
+            return crow::response(400, "Invalid data");
+        }
+
+        int claimID = data["claimID"].i();
+        string status = data["status"].s();
+
+        InsuranceClaim claim = get_claim(claimID);
+        if (claim.P_id == 0) {
+            return crow::response(400, "Insurance claim not found! Please check claimID!");
+        }
+
+        updateInsuranceClaim(claimID, status);
+
+        crow::json::wvalue response_data;
+        response_data["Insurance Claim"] = claimID;
+        response_data["Message"] = "Insurance claim status successfully updated!";
+
+        return crow::response(200, response_data);
+        });
+
+    CROW_ROUTE(hcm, "/insurance_claims").methods("GET"_method)([](const crow::request& req) {
+        return crow::response(200, print_insuranceClaims().dump());
         });
 
     hcm.bindaddr("127.0.0.1").port(18080).run();

@@ -70,14 +70,20 @@ request method: GET
 http://localhost:18080/record_medical_history        
 request method: POST             
 request body:        
-{        
-    "patient_id": XXXXXXX,        
-    "doctor_id": XXXXXXX,        
-    "date": "YYYY-MM-DD",        
-    "prescription": "no restriction"        
-}        
+{
+    "patient_id": 9325583,
+    "doctor_id": 7727651,
+    "date": "2024-02-15",
+    "prescription": "am",
+    "startTime": 11.40,
+    "finishTime": 12.00,
+    "examinationFee": 34.50,
+    "medications": "medicationA, medicationB"       
+}
 
-*(8) Retrieve medical history        
+*Record medical history operation will activate bill and insurance claim generation
+
+*(8) Retrieve medical history by patient_id       
 http://localhost:18080/medical_history?patient_id=1029172        
 request method: GET           
 
@@ -87,12 +93,21 @@ http://localhost:18080/medical_history
 request method: GET           
 request params :            
 	key: patient_id        
-	value: XXXXXXX        
+	value: XXXXXXX      
 
-## 4 Project file structure
+*(9) Update insurance claim status by claim_id 
+http://localhost:18080/update_insurance_claim      
+request method: POST        
+request body:        
+{        
+    "claimID": 7902912,
+    "status": "Finished"        
+}        
 
-* Not now
+*(10) Retrieve all insurance claims in order to track their status        
+http://localhost:18080/insurance_claims        
+request method: GET 
 
-## 5 Contribution
+## 4 Contribution
 
 If you want to contribute or comment on this project, email lihongtaoix7@gmail.com.
