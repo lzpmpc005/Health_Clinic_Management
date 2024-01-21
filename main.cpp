@@ -101,12 +101,19 @@ public:
     string S_name;
     int S_quantity;
     double S_price;
+
+    Supplies(const string& name, int quantity, double price)
+        : S_name(name), S_quantity(quantity), S_price(price) {}
 };
 class Orders {
+public:
     int O_id;
     string O_supplies;
     int O_quantity;
     string O_status;
+
+    Orders(int orderID, const string& supplies, int quantity, const string& status)
+        : O_id(orderID), O_supplies(supplies), O_quantity(quantity), O_status(status) {}
 };
 
 void createTables(sqlite3* db) {
@@ -194,7 +201,7 @@ void createTables(sqlite3* db) {
     }
 
     const char* createOrdersTableSQL = "CREATE TABLE IF NOT EXISTS orders ("
-        "orderId INTEGER,"
+        "orderID INTEGER,"
         "supplies TEXT NOT NULL,"
         "quantity INTEGER,"
         "status TEXT NOT NULL);";
@@ -773,7 +780,7 @@ void make_order(const string& supply, int quantity) {
 
     sqlite3_exec(db, "BEGIN;", nullptr, nullptr, nullptr);
 
-    string sql = "INSERT INTO orders (supplies, quantity, status) VALUES (" + to_string(id) + ", '" + supply + "', " + to_string(quantity) + ", '" + status + "');";
+    string sql = "INSERT INTO orders (orderID, supplies, quantity, status) VALUES (" + to_string(id) + ", '" + supply + "', " + to_string(quantity) + ", '" + status + "');";
     int result = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr);
 
     if (result != SQLITE_OK) {
@@ -786,7 +793,7 @@ void make_order(const string& supply, int quantity) {
     sqlite3_close(db);
 }
 
-void updateOrderStatus(int claimId, const string& status)
+void updateOrderStatus(int orderId, const string& status)
 {
     sqlite3* db;
     if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
@@ -795,7 +802,7 @@ void updateOrderStatus(int claimId, const string& status)
 
     sqlite3_exec(db, "BEGIN;", nullptr, nullptr, nullptr);
 
-    string sql = "UPDATE insuranceClaims SET status = '" + status + "' WHERE claimID = " + to_string(claimId) + ";";
+    string sql = "UPDATE orders SET status = '" + status + "' WHERE orderId = " + to_string(orderId) + ";";
 
     int result = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr);
 
@@ -809,8 +816,76 @@ void updateOrderStatus(int claimId, const string& status)
     sqlite3_close(db);
 }
 
+Orders get_order(int orderId) {
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+
+    sqlite3_open("clinic.db", &db);
+
+    string sql = "SELECT * FROM orders WHERE orderID = " + to_string(orderId) + ";";
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, NULL);
+
+    Orders order(0, "", 0, "");
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        order.O_id = sqlite3_column_int(stmt, 0);
+        order.O_supplies = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+        order.O_quantity = sqlite3_column_int(stmt, 2);
+        order.O_status = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    return order;
+}
+
+void addSupply(int orderID) {
+
+    Orders order = get_order(orderID);
+
+    sqlite3* db;
+    sqlite3_open("clinic.db", &db);
+
+    int quantity = order.O_quantity;
+    string supplyName = order.O_supplies;
+    double price = 9.9;
+
+    string checkSql = "SELECT COUNT(*) FROM supplies WHERE supplyName = ?";
+    sqlite3_stmt* checkStmt;
+    sqlite3_prepare_v2(db, checkSql.c_str(), -1, &checkStmt, NULL);
+    sqlite3_bind_text(checkStmt, 1, supplyName.c_str(), -1, SQLITE_STATIC);
+
+    if (sqlite3_step(checkStmt) == SQLITE_ROW && sqlite3_column_int(checkStmt, 0) == 0) {
+        // Supply name doesn't exist, insert a new row
+        string insertSql = "INSERT INTO supplies (supplyName, quantity, price) VALUES (?, ?, ?)";
+        sqlite3_stmt* insertStmt;
+        sqlite3_prepare_v2(db, insertSql.c_str(), -1, &insertStmt, NULL);
+
+        sqlite3_bind_text(insertStmt, 1, supplyName.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_int(insertStmt, 2, quantity);
+        sqlite3_bind_double(insertStmt, 3, price);
+
+        sqlite3_step(insertStmt);
+        sqlite3_finalize(insertStmt);
+    }
+    else {
+        // Supply name exists, update the quantity
+        string updateSql = "UPDATE supplies SET quantity = quantity + ? WHERE supplyName = ?";
+        sqlite3_stmt* updateStmt;
+        sqlite3_prepare_v2(db, updateSql.c_str(), -1, &updateStmt, NULL);
+
+        sqlite3_bind_int(updateStmt, 1, quantity);
+        sqlite3_bind_text(updateStmt, 2, supplyName.c_str(), -1, SQLITE_STATIC);
+
+        sqlite3_step(updateStmt);
+        sqlite3_finalize(updateStmt);
+    }
+
+    sqlite3_finalize(checkStmt);
+    sqlite3_close(db);
+}
+
 int main() {
-    //make_order("syringe", 100);
     sqlite3* db;
     if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
         fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
@@ -1115,6 +1190,52 @@ int main() {
     CROW_ROUTE(hcm, "/insurance_claims").methods("GET"_method)([](const crow::request& req) {
         return crow::response(200, print_insuranceClaims().dump());
         });
+
+    CROW_ROUTE(hcm, "/make_order").methods("POST"_method)([&](const crow::request& req) {
+
+        auto data = crow::json::load(req.body);
+        if (!data || !data.has("supplyName") || !data.has("quantity")) {
+            return crow::response(400, "Invalid data");
+        }
+
+        string supplyName = data["supplyName"].s();
+        int quantity = data["quantity"].i();
+
+        try {
+            make_order(supplyName, quantity);
+            crow::json::wvalue response_data;
+            response_data["message"] = "Order Submitted";
+            response_data["supplyName"] = supplyName;
+            response_data["quantity"] = quantity;
+            return crow::response(200, response_data);
+        }
+        catch (const std::runtime_error& e) {
+            return crow::response(500, e.what());
+        }
+        });
+
+    CROW_ROUTE(hcm, "/update_order_status").methods("POST"_method)([](const crow::request& req) {
+        auto data = crow::json::load(req.body);
+        if (!data || !data.has("orderID") || !data.has("status")) {
+            return crow::response(400, "Invalid data");
+        }
+
+        int orderID = data["orderID"].i();
+        string status = data["status"].s();
+
+        updateOrderStatus(orderID, status);
+
+        crow::json::wvalue response_data;
+        response_data["Order"] = orderID;
+        response_data["Message"] = "Order status updated!";
+
+        if (status == "received") {
+            addSupply(orderID);
+        }
+
+        return crow::response(200, response_data);
+        });
+
 
     hcm.bindaddr("127.0.0.1").port(18080).run();
 }
