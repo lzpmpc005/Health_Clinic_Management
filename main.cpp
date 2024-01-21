@@ -7,6 +7,7 @@
 #include <chrono>
 #include <regex>
 
+
 using namespace std;
 
 class Doctor {
@@ -95,7 +96,18 @@ public:
     InsuranceClaim(int patientID, int claimID, const string& insuranceProvider, const string& insurancePolicyNumber, const string& status)
         : P_id(patientID), C_id(claimID), C_insuranceProvider(insuranceProvider), C_insurancePolicyNumber(insurancePolicyNumber), C_status(status) {}
 };
-
+class Supplies {
+public:
+    string S_name;
+    int S_quantity;
+    double S_price;
+};
+class Orders {
+    int O_id;
+    string O_supplies;
+    int O_quantity;
+    string O_status;
+};
 
 void createTables(sqlite3* db) {
     char* errorMessage;
@@ -166,6 +178,29 @@ void createTables(sqlite3* db) {
 
     if (sqlite3_exec(db, createInsuranceClaimsTableSQL, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
         cerr << "Error creating InsuranceClaims table: " << errorMessage << endl;
+        sqlite3_free(errorMessage);
+        return;
+    }
+
+    const char* createSuppliesTableSQL = "CREATE TABLE IF NOT EXISTS supplies ("
+        "supplyName TEXT NOT NULL,"
+        "quantity INTEGER,"
+        "price DOUBLE);";
+
+    if (sqlite3_exec(db, createSuppliesTableSQL, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
+        cerr << "Error creating Supplies table: " << errorMessage << endl;
+        sqlite3_free(errorMessage);
+        return;
+    }
+
+    const char* createOrdersTableSQL = "CREATE TABLE IF NOT EXISTS orders ("
+        "orderId INTEGER,"
+        "supplies TEXT NOT NULL,"
+        "quantity INTEGER,"
+        "status TEXT NOT NULL);";
+
+    if (sqlite3_exec(db, createOrdersTableSQL, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
+        cerr << "Error creating orders table: " << errorMessage << endl;
         sqlite3_free(errorMessage);
         return;
     }
@@ -728,7 +763,54 @@ crow::json::wvalue print_insuranceClaims() {
     return claims;
 }
 
+void make_order(const string& supply, int quantity) {
+    sqlite3* db;
+    if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
+        return;
+    }
+    int id = Generate_id();
+    string status = "Ordered";
+
+    sqlite3_exec(db, "BEGIN;", nullptr, nullptr, nullptr);
+
+    string sql = "INSERT INTO orders (supplies, quantity, status) VALUES (" + to_string(id) + ", '" + supply + "', " + to_string(quantity) + ", '" + status + "');";
+    int result = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr);
+
+    if (result != SQLITE_OK) {
+        sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+    }
+    else {
+        sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr);
+    }
+
+    sqlite3_close(db);
+}
+
+void updateOrderStatus(int claimId, const string& status)
+{
+    sqlite3* db;
+    if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
+        return;
+    }
+
+    sqlite3_exec(db, "BEGIN;", nullptr, nullptr, nullptr);
+
+    string sql = "UPDATE insuranceClaims SET status = '" + status + "' WHERE claimID = " + to_string(claimId) + ";";
+
+    int result = sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr);
+
+    if (result != SQLITE_OK) {
+        sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+    }
+    else {
+        sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr);
+    }
+
+    sqlite3_close(db);
+}
+
 int main() {
+    //make_order("syringe", 100);
     sqlite3* db;
     if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
         fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
