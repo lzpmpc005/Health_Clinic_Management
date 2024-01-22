@@ -6,6 +6,7 @@
 #include <map>
 #include <chrono>
 #include <regex>
+#include <boost/lexical_cast.hpp>
 
 
 using namespace std;
@@ -116,6 +117,21 @@ public:
         : O_id(orderID), O_supplies(supplies), O_quantity(quantity), O_status(status) {}
 };
 
+class Inventory {
+public:
+    string I_name;
+    double I_price;
+    int I_quantity;
+};
+class Log {
+public:
+    int L_id;
+    string L_date;
+    string L_status;
+    string I_name;
+    int I_quantity;
+};
+
 void createTables(sqlite3* db) {
     char* errorMessage;
 
@@ -212,6 +228,33 @@ void createTables(sqlite3* db) {
         return;
     }
 }
+
+void createInventoryTables(sqlite3* db) {
+    char* errorMessage;
+
+    const char* createInventoryTableSQL = "CREATE TABLE IF NOT EXISTS inventory ("
+                                          "name TEXT PRIMARY KEY,"
+                                          "quantity INTEGER NOT NULL,"
+                                          "price DOUBLE NOT NULL);";
+    if (sqlite3_exec(db, createInventoryTableSQL, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
+        cerr << "Error creating Inventory table: " << errorMessage << endl;
+        sqlite3_free(errorMessage);
+        return;
+    }
+
+    const char* createInventoryLogTableSQL = "CREATE TABLE IF NOT EXISTS inventoryLog ("
+                                             "id INTEGER PRIMARY KEY,"
+                                             "date TEXT NOT NULL,"
+                                             "status TEXT NOT NULL,"
+                                             "name TEXT NOT NULL,"
+                                             "quantity INTEGER NOT NULL);";
+    if (sqlite3_exec(db, createInventoryLogTableSQL, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
+        cerr << "Error creating InventoryLog table: " << errorMessage << endl;
+        sqlite3_free(errorMessage);
+        return;
+    }
+}
+
 
 int Generate_id() {
     std::random_device rd;
@@ -885,6 +928,140 @@ void addSupply(int orderID) {
     sqlite3_close(db);
 }
 
+string addToInventory(sqlite3* db, const string& itemName, int quantity, const string& currentDate) {
+    char* errorMessage = nullptr;
+    sqlite3_stmt* stmt = nullptr;
+
+    if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
+        cerr << "Error opening the database: " << sqlite3_errmsg(db) << endl;
+        return "Error opening the database.";
+    }
+
+    string updateInventorySQL = "UPDATE inventory SET quantity = quantity + ? WHERE name = ?;";
+
+    if (sqlite3_prepare_v2(db, updateInventorySQL.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "Error preparing update inventory SQL statement: " << sqlite3_errmsg(db) << endl;
+        return "Error preparing database.";
+    }
+
+    sqlite3_bind_int(stmt, 1, quantity);
+    sqlite3_bind_text(stmt, 2, itemName.c_str(), -1, SQLITE_STATIC);
+
+    // Execute the SQL query
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        cerr << "Error updating inventory: " << sqlite3_errmsg(db) << endl;
+        sqlite3_finalize(stmt);
+        return "Error updating inventory. Status: Not Used";
+    }
+
+    sqlite3_finalize(stmt);
+
+    int logId = Generate_id();
+
+    string insertLogSQL = "INSERT INTO inventoryLog (id, date, status, name, quantity) VALUES (?, ?, ?, ?, ?);";
+
+    if (sqlite3_prepare_v2(db, insertLogSQL.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "Error preparing insert log SQL statement: " << sqlite3_errmsg(db) << endl;
+        return "Error preparing database.";
+    }
+
+    sqlite3_bind_int(stmt, 1, logId);
+    sqlite3_bind_text(stmt, 2, currentDate.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, "Added", -1, SQLITE_STATIC);  // Status: Added
+    sqlite3_bind_text(stmt, 4, itemName.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 5, quantity);
+
+    // Execute the SQL query for log entry
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        cerr << "Error inserting log entry: " << sqlite3_errmsg(db) << endl;
+        sqlite3_finalize(stmt);
+        return "Error inserting log entry. Status: Not Used";
+    }
+
+    sqlite3_finalize(stmt);
+
+    return "Successfully added to inventory. Status: Added";
+
+    sqlite3_close(db);
+
+}
+
+string useFromInventory(sqlite3* db, const string& itemName, int quantity, const string& currentDate) {
+    char* errorMessage = nullptr;
+
+    if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
+        cerr << "Error opening the database: " << sqlite3_errmsg(db) << endl;
+        return "Error opening the database.";
+    }
+
+    string checkQuantitySQL = "SELECT quantity FROM inventory WHERE name = ?;";
+    int currentQuantity;
+    sqlite3_stmt* stmt = nullptr;
+
+    if (sqlite3_prepare_v2(db, checkQuantitySQL.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "Error preparing check quantity SQL statement: " << sqlite3_errmsg(db) << endl;
+        return "Error preparing database.";
+    }
+    sqlite3_bind_text(stmt, 1, itemName.c_str(), -1, SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        cerr << "Error fetching quantity from inventory: " << sqlite3_errmsg(db) << endl;
+        sqlite3_finalize(stmt);
+        return "Error fetching quantity from inventory.";
+    }
+
+    currentQuantity = sqlite3_column_int(stmt, 0);
+    sqlite3_finalize(stmt);
+
+    if (currentQuantity < quantity) {
+        cerr << "Error: Not enough quantity in inventory." << endl;
+        return "Not enough quantity in inventory. Status: Not Used";
+    }
+
+    string updateInventorySQL = "UPDATE inventory SET quantity = quantity - ? WHERE name = ?;";
+    if (sqlite3_prepare_v2(db, updateInventorySQL.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "Error preparing update inventory SQL statement: " << sqlite3_errmsg(db) << endl;
+        return "Error updating inventory.";
+    }
+    sqlite3_bind_int(stmt, 1, quantity);
+    sqlite3_bind_text(stmt, 2, itemName.c_str(), -1, SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        cerr << "Error updating inventory: " << sqlite3_errmsg(db) << endl;
+        sqlite3_finalize(stmt);
+        return "Error updating inventory. Status: Not Used";
+    }
+
+    sqlite3_finalize(stmt);
+
+    int logId = Generate_id();
+
+    string insertLogSQL = "INSERT INTO inventoryLog (id, date, status, name, quantity) VALUES (?, ?, ?, ?, ?);";
+    if (sqlite3_prepare_v2(db, insertLogSQL.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "Error preparing insert log SQL statement: " << sqlite3_errmsg(db) << endl;
+        return "Error inserting log entry.";
+    }
+    sqlite3_bind_int(stmt, 1, logId);
+    sqlite3_bind_text(stmt, 2, currentDate.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, "Used", -1, SQLITE_STATIC);  // Status: Used
+    sqlite3_bind_text(stmt, 4, itemName.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 5, quantity);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        cerr << "Error inserting log entry: " << sqlite3_errmsg(db) << endl;
+        sqlite3_finalize(stmt);
+        return "Error inserting log entry. Status: Not Used";
+    }
+
+    sqlite3_finalize(stmt);
+
+    return "Successfully used from inventory. Status: Used";
+
+    sqlite3_close(db);
+
+}
+
+
 int main() {
     sqlite3* db;
     if (sqlite3_open("clinic.db", &db) != SQLITE_OK) {
@@ -892,6 +1069,8 @@ int main() {
         return -1;
     }
     createTables(db);
+    createInventoryTables(db);
+
     sqlite3_close(db);
 
     crow::SimpleApp hcm;
@@ -1235,6 +1414,55 @@ int main() {
 
         return crow::response(200, response_data);
         });
+
+    CROW_ROUTE(hcm, "/add_to_inventory").methods("POST"_method)([&db](const crow::request& req) {
+        auto data = crow::json::load(req.body);
+        if (!data || !data.has("itemName") || !data.has("quantity")) {
+            return crow::response(400, "Invalid data");
+        }
+
+        string itemName = data["itemName"].s();
+        int quantity = data["quantity"].i();
+        string currentDate = data["date"].s();
+
+        Inventory item;
+        item.I_name = itemName;
+        item.I_quantity = quantity;
+
+        Log log;
+        log.L_date = currentDate;
+
+        string result = addToInventory(db, itemName, quantity, currentDate);
+
+        crow::json::wvalue response_data;
+        response_data["ItemName"] = itemName;
+        response_data["Message"] = result;
+
+        return crow::response(200, response_data);
+    });
+
+    CROW_ROUTE(hcm, "/use_from_inventory").methods("POST"_method)([&db](const crow::request& req) {
+        auto data = crow::json::load(req.body);
+        if (!data || !data.has("itemName") || !data.has("quantity")) {
+            return crow::response(400, "Invalid data");
+        }
+
+        string itemName = data["itemName"].s();
+        int quantity = data["quantity"].i();
+        string currentDate = data["date"].s();
+
+        Inventory item;
+        item.I_name = itemName;
+        item.I_quantity = quantity;
+
+        string result = useFromInventory(db, itemName, quantity, currentDate);
+
+        crow::json::wvalue response_data;
+        response_data["ItemName"] = itemName;
+        response_data["Message"] = result;
+
+        return crow::response(200, response_data);
+    });
 
 
     hcm.bindaddr("127.0.0.1").port(18080).run();
