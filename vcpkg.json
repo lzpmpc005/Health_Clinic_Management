@@ -1,0 +1,8 @@
+{
+  "dependencies": [
+    "crow",
+    "sqlite3",
+    "jsoncpp",
+    "mailio"
+  ]
+}
