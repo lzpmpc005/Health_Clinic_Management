@@ -1,0 +1,5 @@
+# ninja log v5
+3911	3996	1705955281346433739	Health_Clinic_Management_Web_V2	f0909a317e1fb97f
+4	69	1706023727299824710	build.ninja	40ae765f94f0193
+0	5501	1706023756802801104	CMakeFiles/Health_Clinic_Management_Web.dir/main.cpp.o	a996020eca5abdbd
+5505	5613	1706023756937503009	Health_Clinic_Management_Web	c82e571f2c126ce3
