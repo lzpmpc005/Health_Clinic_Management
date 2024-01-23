@@ -13,29 +13,29 @@ This application is built with C++ and can be run in both Windows/MacOs/Linux. B
 
 * 2. Windows11 and Visual Studio 2022
 
-  * 2.1 Create a new console project
+  *  Create a new console project
 
-  * 2.2 Delete the main.cpp of the new project
+  *  Delete the main.cpp of the new project
 Download the "vcpkg.json" file and  "Health_Clinic_Management.cpp" file and copy them to your project directory.
 
-  * 2.3 Turn on vcpkg manifest mode in the properties of you project. 
+  *  Turn on vcpkg manifest mode in the properties of you project. 
 
-  * 2.4 Compile and run
+  *  Compile and run
 When you compile, Visual Studio will intall those libraires automaticly.
 
 * 3. Linux and VS code
 
-  * 3.1 Install Crow 1.0     
+  *  Install Crow 1.0     
 Crow is a C++ framework for creating HTTP or Websocket web services, similar to Python's Flask.   
 Install Crow 1.0 follow the instruction ['here'](https://crowcpp.org/master/).
 
-  * 3.2 Install splite3        
+  *  Install splite3        
 We use sqlite3 to manage our data. If you don't have sqlite3 in your environment, search online based on your OS and IDE. May God Help You!
 
-  * 3.3 Create a new Project in VS code
+  *  Create a new Project in VS code
 Download "Health_Clinic_Management.cpp" file and replace the main.cpp of your newly created project.
 
-  * 3.4 Compile and run
+  *  Compile and run
 
 
 ## 3 Features
